@@ -10,12 +10,16 @@ from customtkinter import filedialog
 from tkinter import messagebox
 import ctypes
 from ctypes import windll
+from tktooltip import ToolTip
+from pystray import MenuItem as item
+import pystray
+import atexit
 
 
 GWL_EXSTYLE = -20
 WS_EX_APPWINDOW = 0x00040000
 WS_EX_TOOLWINDOW = 0x00000080
-myappid = 'mycompany.myproduct.subproduct.version' # arbitrary string
+myappid = '1237222'
 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
 titleFont = ("Futura", 32, "bold")
@@ -30,6 +34,7 @@ videoDir = (selected_dir + "/Videos")
 imageDir = (selected_dir + "/Images")
 documentDir = (selected_dir + "/Documents")
 zipfileDir = (selected_dir + "/Zip_Files")
+infoTxt = ("currently sorting: " + selected_dir)
     
 imageExtensions = [".jpg", ".jpeg", ".jpe", ".jif", ".jfif", ".jfi", ".png", ".gif", ".webp", ".tiff", ".tif", ".psd", ".raw", ".arw", ".cr2", ".nrw",
                     ".k25", ".bmp", ".dib", ".heif", ".heic", ".ind", ".indd", ".indt", ".jp2", ".j2k", ".jpf", ".jpf", ".jpx", ".jpm", ".mj2", ".svg", ".svgz", ".ai", ".eps", ".ico"]
@@ -158,12 +163,17 @@ class App(customtk.CTk):
 
         self.entrydir = customtk.CTkLabel(self, text=selected_dir, bg_color="#181414", text_color="#fff", corner_radius=0, fg_color="#302c34", font=pholderText)
         self.entrydir.grid(row=1, column=0, sticky="ew", columnspan=2, padx=(200, 50))
-        self.entrydir.bind("<FocusIn>", self.clear_entry)
 
         self.exitApp = customtk.CTkButton(self, text="x", text_color="#fff", font=navFont, width=25, corner_radius=0, fg_color="transparent", bg_color="#181414", hover_color="#181414", command=self.close_app)
         self.exitApp.place(relx=.96, rely=.01)
         self.exitApp.bind("<Enter>", lambda event: self.exitApp.configure(cursor="hand2"))
         self.exitApp.bind("<Leave>", lambda event: self.exitApp.configure(cursor=""))
+
+        self.hideApp = customtk.CTkButton(self, text="-", text_color="#fff", font=navFont, width=25, corner_radius=0, fg_color="transparent", bg_color="#181414", hover_color="#181414", command=self.hide_window)
+        self.hideApp.place(relx=.92, rely=.01)
+        self.hideApp.bind("<Enter>", lambda event: self.hideApp.configure(cursor="hand2"))
+        self.hideApp.bind("<Leave>", lambda event: self.hideApp.configure(cursor=""))
+        ToolTip(self.hideApp, msg="This button will dock the app to tray, \n sorting will continue whilst app is open.")
 
         github_logo = self.load_and_display_icon("Images/github-mark-white.png", 40, 40)
         github_label = customtk.CTkLabel(self, image=github_logo, text="", bg_color="#181414")
@@ -185,7 +195,6 @@ class App(customtk.CTk):
         twitter_label.bind("<Button-1>", lambda event: self.on_twitter_click())
         twitter_label.bind("<Enter>", lambda event: self.change_cursor("hand2"))
         twitter_label.bind("<Leave>", lambda event: self.change_cursor(""))
-
         self.grid_rowconfigure(2, weight=1)
 
         self.startSort = customtk.CTkButton(self, text="SORT!", text_color="#fff", corner_radius=0, bg_color="#d03404", fg_color="#ff3c04", hover_color="#201c24", command=self.sort)
@@ -229,6 +238,7 @@ class App(customtk.CTk):
         global imageDir
         global documentDir
         global zipfileDir
+        global infoTxt
         folder_path = filedialog.askdirectory()
         if folder_path:
             selected_dir = folder_path
@@ -238,22 +248,29 @@ class App(customtk.CTk):
             imageDir = (selected_dir + "/Images")
             documentDir = (selected_dir + "/Documents")
             zipfileDir = (selected_dir + "/Zip_Files")
-            self.entrydir.configure(text="")  # Clear the entry widget
+            infoTxt = ("Currently sorting: " + selected_dir)
+            self.entrydir.configure(text="")
             self.entrydir.configure(text=selected_dir)
 
-    def close_app(self):
-        self.destroy()
-        sys.exit()
 
-    def clear_entry(self, event):
-        self.entrydir.delete(0, customtk.END)
+    def close_app(self):
+            self.destroy()
+            os._exit(0)
+
+    def show_window(self, icon, item):
+        icon.stop()
+        self.after(0, self.deiconify())
+
+    def hide_window(self):
+        self.withdraw()
+        image = Image.open("Images/icon.ico")
+        menu = (item('Quit', self.close_app), item('Show', self.show_window))
+        icon = pystray.Icon("File Organiser", image, "Sorting...", menu)
+        icon.run()
 
     def load_and_display_icon(self, file_path, width, height):
-        # Load the image
         image = Image.open(file_path)
-        # Resize the image if needed
         image = image.resize((width, height))
-        # Convert the image to Tkinter PhotoImage format
         tk_image = ImageTk.PhotoImage(image)
 
         return tk_image
@@ -309,6 +326,9 @@ class App(customtk.CTk):
             else:
                 logging.info(f"Zip Folder exists")
 
+            self.sortInfo = customtk.CTkLabel(self, text=infoTxt, bg_color="#181414", font=pholderText, )
+            self.sortInfo.grid(row=2, column=1, sticky="se", padx=50, pady=52)
+
             if self.observer:
                 self.observer.stop()
                 self.observer.join()
@@ -335,7 +355,7 @@ class App(customtk.CTk):
             
    # SMALL DEBUG
    # def check(self):
-   #     print ("hi:" + selected_dir + "this:" + selected_dir)
+   #     print ("hi:" + selected_dir)
    #     print ("1:" + soundDir)
    #     print ("1:" + documentDir)
    #     print ("1:" + zipfileDir)
